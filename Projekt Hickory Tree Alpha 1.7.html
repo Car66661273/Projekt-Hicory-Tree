@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Particle Sandbox Alpha 1.7 Build 2</title>
+<style>
+  body { margin:0; display:flex; font-family:sans-serif; background:#222; color:#eee; height:100vh; }
+  #sidebar { width:200px; padding:10px; background:#333; overflow-y:auto; flex-shrink:0; }
+  button, label { width:100%; margin-bottom:5px; padding:5px; font-size:14px; display:block; }
+  input[type=range] { width:100%; margin-bottom:10px; }
+  canvas { border:1px solid #555; cursor:crosshair; margin:10px; flex-shrink:0; display:block; }
+  #formButton { margin-top:10px; background:#666; color:#fff; padding:5px; text-align:center; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <strong>Particles</strong>
+  <button style="background:#d4b96a;" onclick="setParticle('sand')">Sand</button>
+  <button style="background:#4da6ff;" onclick="setParticle('water')">Water</button>
+  <button style="background:#8B4513;" onclick="setParticle('dirt')">Dirt</button>
+  <button style="background:#654321;" onclick="setParticle('mud')">Mud</button>
+  <button style="background:#A9A9A9;" onclick="setParticle('stone')">Stone</button>
+  <button style="background:#FFD700;" onclick="setParticle('gold')">Gold</button>
+  <button style="background:#B0C4DE;" onclick="setParticle('iron')">Iron</button>
+  <button style="background:#C0C0C0;" onclick="setParticle('silver')">Silver</button>
+  <button style="background:#B87333;" onclick="setParticle('copper')">Copper</button>
+  <button style="background:#E5E4E2;" onclick="setParticle('platinum')">Platinum</button>
+  <button style="background:#222222;" onclick="setParticle('coal')">Coal</button>
+  <button style="background:#000000;" onclick="setParticle('oil')">Oil</button>
+  <button style="background:red;" onclick="setParticle('tnt')">TNT</button>
+  <button style="background:orange;" onclick="setParticle('fire')">Fire</button>
+  <button style="background:#FF4500;" onclick="setParticle('lava')">Lava</button>
+  <button style="background:white; color:black;" onclick="setParticle('ash')">Ash</button>
+  <button style="background:#555;" onclick="setParticle('eraser')">Eraser</button>
+
+  <strong>Brush Size</strong>
+  <label for="brushSlider">Size: <span id="brushValue">5</span></label>
+  <input type="range" id="brushSlider" min="1" max="50" value="5">
+  <button onclick="setBrushPreset(1)">Tiny</button>
+  <button onclick="setBrushPreset(5)">Small</button>
+  <button onclick="setBrushPreset(15)">Medium</button>
+  <button onclick="setBrushPreset(30)">Large</button>
+  <button onclick="setBrushPreset(50)">Mega</button>
+
+  <strong>Canvas Size</strong>
+  <button onclick="createCanvas(600,400)">Small</button>
+  <button onclick="createCanvas(1024,600)">Medium</button>
+  <button onclick="createCanvas(1368,768)">Fullscreen</button>
+  <div><strong>Advanced Canvas</strong>
+    <label>Width: <input type="number" id="customWidth" value="1024"></label>
+    <label>Height: <input type="number" id="customHeight" value="600"></label>
+    <button onclick="createCustomCanvas()">Apply</button>
+  </div>
+
+  <button onclick="clearCanvas()">Clear</button>
+</div>
+
+<canvas id="canvas" width="1024" height="600"></canvas>
+<div id="formButton" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLScdbPn8efZfhfTKMuHCjxtnX8QPBuTTl-djt7bKc-SI_FWn8Q/viewform?usp=dialog')">Suggestions / Feedback</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let width = canvas.width, height = canvas.height;
+let grid = [];
+function initGrid(w,h){
+  grid = [];
+  for(let x=0;x<w;x++){
+    grid[x]=[];
+    for(let y=0;y<h;y++) grid[x][y]=null;
+  }
+}
+initGrid(width,height);
+
+let currentParticle = 'sand';
+let brushSize = 5;
+const brushSlider = document.getElementById('brushSlider');
+const brushValue = document.getElementById('brushValue');
+brushSlider.addEventListener('input', () => { brushSize=parseInt(brushSlider.value); brushValue.textContent=brushSize; });
+function setBrushPreset(size){ brushSize=size; brushSlider.value=size; brushValue.textContent=size; }
+function setParticle(type){ currentParticle=type; }
+function clearCanvas(){ initGrid(width,height); }
+function createCanvas(w,h){ canvas.width=w; canvas.height=h; canvas.style.width=w+'px'; canvas.style.height=h+'px'; width=w; height=h; initGrid(width,height); lastMouse=null; }
+function createCustomCanvas(){ createCanvas(parseInt(document.getElementById('customWidth').value), parseInt(document.getElementById('customHeight').value)); }
+
+let isMouseDown=false,lastMouse=null;
+canvas.addEventListener('mousedown',(e)=>{ isMouseDown=true; handleMouse(e); });
+canvas.addEventListener('mouseup',()=>{ isMouseDown=false; lastMouse=null; });
+canvas.addEventListener('mouseleave',()=>{ isMouseDown=false; lastMouse=null; });
+canvas.addEventListener('mousemove',(e)=>{ if(isMouseDown) handleMouse(e); });
+
+function handleMouse(e){
+  const rect=canvas.getBoundingClientRect();
+  const x=Math.floor((e.clientX-rect.left)*(canvas.width/rect.width));
+  const y=Math.floor((e.clientY-rect.top)*(canvas.height/rect.height));
+  if(lastMouse){
+    const dx=x-lastMouse.x, dy=y-lastMouse.y, steps=Math.max(Math.abs(dx),Math.abs(dy));
+    for(let i=0;i<=steps;i++){
+      const ix=Math.round(lastMouse.x + dx*i/steps), iy=Math.round(lastMouse.y + dy*i/steps);
+      placeParticle(ix,iy);
+    }
+  } else placeParticle(x,y);
+  lastMouse={x,y};
+}
+
+function placeParticle(x,y){
+  for(let dx=-Math.floor(brushSize/2); dx<=Math.floor(brushSize/2); dx++){
+    for(let dy=-Math.floor(brushSize/2); dy<=Math.floor(brushSize/2); dy++){
+      const px=x+dx, py=y+dy;
+      if(px>=0 && px<width && py>=0 && py<height){
+        if(currentParticle==='eraser') grid[px][py]=null;
+        else if(currentParticle==='ash') grid[px][py]={type:'ash', color:null};
+        else grid[px][py]={type:currentParticle, color:null};
+      }
+    }
+  }
+}
+
+function update(){
+  for(let y=height-1;y>=0;y--){
+    for(let x=0;x<width;x++){
+      const cell=grid[x][y];
+      if(!cell) continue;
+      const p=cell.type;
+
+      // Gravity
+      if(['sand','dirt','mud','stone','sandstone','granite','coal'].includes(p)){
+        if(y+1<height && !grid[x][y+1]) { grid[x][y+1]=cell; grid[x][y]=null; }
+        else if(y+1<height && x-1>=0 && !grid[x-1][y+1]) { grid[x-1][y+1]=cell; grid[x][y]=null; }
+        else if(y+1<height && x+1<width && !grid[x+1][y+1]) { grid[x+1][y+1]=cell; grid[x][y]=null; }
+      }
+
+      // Water / Lava / Oil flow
+      if(['water','lava','oil'].includes(p)){
+        let moved=false;
+        if(y+1<height && !grid[x][y+1]){ grid[x][y+1]=cell; grid[x][y]=null; moved=true; }
+        if(!moved){ const dir=Math.random()<0.5?-1:1; if(x+dir>=0 && x+dir<width && !grid[x+dir][y]){ grid[x+dir][y]=cell; grid[x][y]=null; } }
+      }
+
+      // Fire
+      if(p==='fire'){
+        const dirs=[[0,-1],[-1,0],[1,0],[0,1]];
+        for(const [dx,dy] of dirs){
+          const nx=x+dx, ny=y+dy;
+          if(nx>=0 && nx<width && ny>=0 && ny<height){
+            const target=grid[nx][ny];
+            if(target?.type==='tnt') explode(nx,ny,12);
+            if(['sand','dirt','mud','stone','sandstone','granite','coal','oil'].includes(target?.type) && Math.random()<0.01){
+              grid[nx][ny]={type:'fire',color:null};
+            }
+          }
+        }
+        if(Math.random()<0.01) grid[x][y]=null;
+      }
+
+      // TNT
+      if(p==='tnt' && cell.life>0){
+        cell.life--;
+        if(cell.life<=0) explode(x,y,12);
+      }
+    }
+  }
+}
+
+function explode(x,y,radius=10){
+  for(let i=Math.max(0,x-radius);i<=Math.min(width-1,x+radius);i++){
+    for(let j=Math.max(0,y-radius);j<=Math.min(height-1,y+radius);j++){
+      const cell=grid[i][j];
+      if(!cell) continue;
+      const dist=Math.hypot(i-x,j-y);
+      if(dist<=radius){
+        const damage=radius-dist;
+        if(damage>getBlastRes(cell.type)){
+          grid[i][j]={type:'fire',color:null};
+        }
+      }
+    }
+  }
+}
+
+function getBlastRes(type){
+  const map={'sand':1,'mud':0.75,'dirt':1,'stone':5,'sandstone':4,'granite':6,'iron':4,'gold':3.5,'silver':3,'copper':3,'platinum':5,'coal':0.5,'tnt':0,'lava':0,'oil':0,'fire':0,'ash':0};
+  return map[type]||1;
+}
+
+function draw(){
+  const imageData=ctx.createImageData(width,height);
+  const data=imageData.data;
+  for(let y=0;y<height;y++){
+    for(let x=0;x<width;x++){
+      const cell=grid[x][y];
+      let r=34,g=34,b=34;
+      if(cell){
+        switch(cell.type){
+          case 'sand': r=212; g=185; b=106; break;
+          case 'water': r=77; g=166; b=255; break;
+          case 'dirt': r=139; g=69; b=19; break;
+          case 'mud': r=100; g=55; b=20; break;
+          case 'stone': r=169; g=169; b=169; break;
+          case 'sandstone': r=237; g=201; b=175; break;
+          case 'granite': r=128; g=128; b=128; break;
+          case 'coal': r=64; g=64; b=64; break;
+          case 'iron': r=176; g=196; b=222; break;
+          case 'gold': r=255; g=215; b=0; break;
+          case 'silver': r=192; g=192; b=192; break;
+          case 'copper': r=184; g=115; b=51; break;
+          case 'platinum': r=229; g=228; b=226; break;
+          case 'oil': r=0; g=0; b=0; break;
+          case 'lava': r=255; g=69; b=0; break;
+          case 'tnt': r=255; g=0; b=0; break;
+          case 'fire': r=255; g=165; b=0; break;
+          case 'ash': r=200; g=200; b=200; break;
+        }
+      }
+      const index=(y*width+x)*4;
+      data[index]=r; data[index+1]=g; data[index+2]=b; data[index+3]=255;
+    }
+  }
+  ctx.putImageData(imageData,0,0);
+}
+
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>
+
