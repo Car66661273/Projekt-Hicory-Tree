@@ -1,1 +1,1 @@
-Download the .HTML file and open it the game will be there, the game really doesnt have a title yet so I just called it Projekt Hickory Tree
+Download the .zip in the code area it should download as Projekt-Hicory-Tree-main. Extract it and open the HTML and you should have the game and just go there everytime its a nice game! I have the previous versions before 1.7 were private due to it being unstable. I might make a unstable branch and previous versions but those won't have every build.
